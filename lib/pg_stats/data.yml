@@ -1,0 +1,121 @@
+pg_stats:
+  commits:
+    sql:
+      >
+        SELECT datname AS database,
+               ROUND((xact_commit * 100.0) / (xact_commit + xact_rollback), 2) AS commit_rollback_ratio,
+               deadlocks,
+               conflicts,
+               temp_files,
+               pg_size_pretty(temp_bytes) as temp_files_size,
+               stats_reset
+        FROM pg_stat_database
+        WHERE (xact_commit + xact_rollback > 0)
+        ORDER BY datname;
+    help:
+      >
+        temp_files and temp_files_size is TOTAL number since stats_reset (probably since release). Postgres creates temp files for sorting, building hashes and other reasons when the size exceeds work_mem limit and operation need to be use disk.
+
+        conflicts - number of queries canceled for some reason, more details can be found in pg_stat_database_conflicts.
+  cache_hits:
+    sql:
+      >
+        SELECT relname as table_name,
+               ROUND(heap_blks_hit * 100.0 / (heap_blks_hit + heap_blks_read), 2) AS cache_hit_ratio,
+               heap_blks_hit,
+               heap_blks_read
+        FROM pg_statio_user_tables 
+        WHERE heap_blks_hit + heap_blks_read > 0
+        ORDER BY cache_hit_ratio;
+    help:
+      >
+        Cache hit ration per table.
+
+  cache_hits_total:
+    sql:
+      >
+        SELECT datname AS database,
+               SUM(blks_hit) * 100 / SUM(blks_hit + blks_read) AS hit_ratio
+        FROM pg_stat_database
+        WHERE (blks_hit + blks_read > 0)
+        GROUP BY datname
+        ORDER BY datname;
+    help:
+      >
+        Cache hit rate ratio in percent.
+  bg_worker:
+    sql:
+      >
+        SELECT checkpoints_timed as checkpoints_scheduled_by_pg,
+               checkpoints_req   as checkpoints_requested_by_user,
+               maxwritten_clean,
+               buffers_backend_fsync
+        FROM pg_stat_bgwriter;
+    help:
+      >
+        maxwritten_clean - bgwrite stops the process because it reached max limit of pages to write. This indicates that DB have very high number of writes (these pages should be flushed by the checkpoint process, but it should be considered an anomaly for normal usage patterns.
+
+        buffers_backend_fsync - bg worker is too buys to handle normal fsync queue so backend process does fsync on it's own. It's anomaly and results in heavy performance drop.
+  disk_sizes:
+    sql:
+      >
+        SELECT relname AS table_name,
+               pg_size_pretty(pg_total_relation_size(relname::regclass)) AS full_size,
+               pg_size_pretty(pg_relation_size(relname::regclass))       AS table_size,
+               pg_size_pretty(pg_total_relation_size(relname::regclass) - pg_relation_size(relname::regclass)) AS indexes_size
+        FROM pg_stat_user_tables
+        ORDER BY pg_total_relation_size(relname::regclass) DESC;
+    help:
+      >
+        Disk sizes per table.
+  seq_scans:
+    sql:
+      >
+        SELECT relname as table_name,
+               seq_scan as number_of_seq_scans,
+               seq_tup_read as number_of_rows_read,
+               seq_tup_read / seq_scan AS avg_tuples_per_scan 
+        FROM pg_stat_user_tables
+        WHERE seq_scan > 0 AND seq_tup_read > 0
+        ORDER BY (seq_tup_read / seq_scan) DESC;
+    help:
+      >
+       Number of scans and rows read along with average per table. If average is above 1000 it's a problem.
+  rows_reads:
+    sql:
+      >
+        SELECT relname AS table_name,
+               seq_tup_read,
+               idx_tup_fetch,
+               ROUND(idx_tup_fetch * 100.0 / nullif(idx_tup_fetch + seq_tup_read, 0), 2) AS percent_with_index
+        FROM pg_stat_user_tables
+        ORDER BY relname;
+    help:
+      >
+        How many records were fetched with index.
+  index_usage:
+    sql:
+      >
+        SELECT indexrelname as index_name,
+               idx_tup_read / nullif(idx_scan, 0) AS avg_tuples_per_scan,
+               idx_scan,
+               idx_tup_read
+        FROM pg_stat_user_indexes
+        ORDER BY idx_scan desc;
+    help:
+      >
+        Index usage statistics.
+
+  query_types:
+    sql:
+      >
+        SELECT relname AS table_name,
+               round(n_tup_ins * 100.0 / (n_tup_ins + n_tup_upd + n_tup_del), 2) AS insert_ratio,
+               round(n_tup_upd * 100.0 / (n_tup_ins + n_tup_upd + n_tup_del), 2) AS update_ratio,
+               round(n_tup_del * 100.0 / (n_tup_ins + n_tup_upd + n_tup_del), 2) AS delete_ratio
+        FROM pg_stat_user_tables 
+        WHERE (n_tup_ins + n_tup_upd + n_tup_del) > 0
+        ORDER BY relname;
+    help:
+      >
+        Ration of insert/update/delete queries per table.
