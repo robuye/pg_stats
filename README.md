@@ -21,6 +21,15 @@ PgStats::Runner.new(dbname: 'my_postgres_database').exec('commits')
 
 Pass to the `#initialize` whatever `PG::Connection` takes. See [the documentation](http://deveiate.org/code/pg/PG/Connection.html#method-c-new) for details.
 
+Or pass connection object directly using keyword args:
+
+```
+connection_object = ActiveRecord::Base.connection
+PgStats::Runner.new(connection: connection_object).execute('commits')
+```
+
+If you are using ActiveRecord connection object you have to call all queries with `execute`, otherwise use `exec`.
+
 Do anything you like with the data.
 
 ## What does it do?

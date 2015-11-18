@@ -6,12 +6,20 @@ module PgStats
     attr_reader :connection
     attr_accessor :data
 
-    def initialize(*args)
-      @connection = PG.connect(*args)
+    def initialize(*args, **keywords)
+      if args.size > 0
+        @connection = PG.connect(*args)
+      else
+        @connection = keywords.delete(:connection) || PG.connect(**keywords)
+      end
     end
 
     def exec(name)
       connection.exec(query(name)).to_a
+    end
+
+    def execute(name)
+      connection.execute(query(name)).to_a
     end
 
     def query(key)
