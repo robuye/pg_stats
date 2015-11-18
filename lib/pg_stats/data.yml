@@ -7,7 +7,8 @@ pg_stats:
                deadlocks,
                conflicts,
                temp_files,
-               pg_size_pretty(temp_bytes) as temp_files_size,
+               temp_bytes as temp_files_size,
+               pg_size_pretty(temp_bytes) as temp_files_size_human,
                stats_reset
         FROM pg_stat_database
         WHERE (xact_commit + xact_rollback > 0)
@@ -60,9 +61,12 @@ pg_stats:
     sql:
       >
         SELECT relname AS table_name,
-               pg_size_pretty(pg_total_relation_size(relname::regclass)) AS full_size,
-               pg_size_pretty(pg_relation_size(relname::regclass))       AS table_size,
-               pg_size_pretty(pg_total_relation_size(relname::regclass) - pg_relation_size(relname::regclass)) AS indexes_size
+               pg_size_pretty(pg_total_relation_size(relname::regclass)) AS full_size_human,
+               pg_size_pretty(pg_relation_size(relname::regclass))       AS table_size_human,
+               pg_size_pretty(pg_total_relation_size(relname::regclass) - pg_relation_size(relname::regclass)) AS indexes_size_human,
+               pg_total_relation_size(relname::regclass) AS full_size,
+               pg_relation_size(relname::regclass)       AS table_size,
+               pg_total_relation_size(relname::regclass) - pg_relation_size(relname::regclass) AS indexes_size
         FROM pg_stat_user_tables
         ORDER BY pg_total_relation_size(relname::regclass) DESC;
     help:
